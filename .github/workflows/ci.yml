@@ -31,11 +31,15 @@ jobs:
         run: java -jar target/bing-wallpaper-jar-with-dependencies.jar
       - name: Commit files
         run: |
-          git config --local user.email "sxyx2008@163.com"
+          git config --local user.email "AgentPhoenix7@users.noreply.github.com"
           git config --local user.name "github-actions"
           git add README.md
           git add bing-wallpaper.md
-          git commit -m "Update README.md & bing-wallpaper.md"
+          if ! git diff --cached --quiet; then
+            git commit -m "Update README.md & bing-wallpaper.md"
+          else
+            echo "No changes to commit."
+          fi
       - name: Push changes
         uses: ad-m/github-push-action@master
         with:
