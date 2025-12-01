@@ -9,7 +9,7 @@ from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn, Ti
 wallpaper_file_path = 'bing-wallpaper.md'
 
 # Base output folder inside the project
-base_folder = os.path.join(os.getcwd(), "Walls")
+base_folder = os.path.join(os.getcwd(), "Bing")
 os.makedirs(base_folder, exist_ok=True)
 
 # Statistics
