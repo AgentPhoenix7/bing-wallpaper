@@ -4,7 +4,7 @@ out
 target/
 
 # Output folder
-Walls/
+Bing/
 
 # Ignore Python cache
 __pycache__/
