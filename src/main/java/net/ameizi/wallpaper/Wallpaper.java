@@ -24,11 +24,11 @@ public class Wallpaper {
     private static final Path wallpaperListPath = Paths.get("bing-wallpaper.md");
 
     // 请求API地址
-    private static final String BING_API = "https://cn.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&nc=1618537156988&pid=hp&uhd=1&uhdwidth=3840&uhdheight=2160";
+    private static final String BING_API = "https://bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&nc=1618537156988&pid=hp&uhd=1&uhdwidth=3840&uhdheight=2160";
     // 最近7天
-    private static final String BING_7DAYS_API = "https://cn.bing.com/HPImageArchive.aspx?format=js&idx=%d&n=1&nc=1618537156988&pid=hp&uhd=1&uhdwidth=3840&uhdheight=2160";
+    private static final String BING_7DAYS_API = "https://bing.com/HPImageArchive.aspx?format=js&idx=%d&n=1&nc=1618537156988&pid=hp&uhd=1&uhdwidth=3840&uhdheight=2160";
     // 图片访问地址
-    private static final String BING_URL = "https://cn.bing.com%s";
+    private static final String BING_URL = "https://bing.com%s";
 
     public static void main(String[] args) throws Exception {
         // 读取 wallpaper 列表
