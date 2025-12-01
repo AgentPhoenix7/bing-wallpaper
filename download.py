@@ -16,7 +16,7 @@ def download_image(i, url, file_name):
         print(f"🥺 [{i + 1}]: Failed to download {url}")
 # Function to scrape image URLs from README file
 def scrape_image_urls(file_path):
-    with open(file_path, 'r') as file:
+    with open(file_path, 'r', encoding='utf-8') as file:
         content = file.read()
 
     # Regular expression to find all URLs that end with image file extensions
