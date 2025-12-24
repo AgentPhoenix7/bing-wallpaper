@@ -1,0 +1,24 @@
+From 3d1b6fe4bbae865e5ca17fe7da3898b3d32a09ca Mon Sep 17 00:00:00 2001
+From: Anis Mandal <83820979+AgentPhoenix7@users.noreply.github.com>
+Date: Wed, 24 Dec 2025 15:13:00 +0530
+Subject: [PATCH] Upgrade Java to 21 LTS; update compiler plugin; remove
+ temporary rewrite.yml
+
+---
+ rewrite.yml | 4 ----
+ 1 file changed, 4 deletions(-)
+ delete mode 100644 rewrite.yml
+
+diff --git a/rewrite.yml b/rewrite.yml
+deleted file mode 100644
+index 785a408..0000000
+--- a/rewrite.yml
++++ /dev/null
+@@ -1,4 +0,0 @@
+-type: specs.openrewrite.org/v1beta/recipe
+-name: upgrade-to-java21
+-recipeList:
+-  - org.openrewrite.java.migrate.UpgradeToJava21
+-- 
+2.51.2.windows.1
+
