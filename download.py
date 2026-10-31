@@ -1,9 +1,16 @@
-import requests
-import re
 import os
-from PIL import Image
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn
+
+import requests
+from PIL import Image
+from rich.progress import (
+    BarColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 
 # Path to the wallpaper list file
 wallpaper_file_path = 'bing-wallpaper.md'
@@ -27,14 +34,14 @@ def is_image_corrupted(file_path):
         with Image.open(file_path) as img:
             img.verify()
         return False
-    except Exception:
+    except (OSError, SyntaxError, ValueError):
         return True
 
 
 def download_single(entry):
     global skipped_count, downloaded_count, removed_corrupted_count
 
-    i, (date_str, url) = entry  # date_str = YYYY-MM-DD
+    _, (date_str, url) = entry  # date_str = YYYY-MM-DD
 
     # Determine original filename from URL
     if "OHR." in url:
@@ -72,7 +79,7 @@ def download_single(entry):
         else:
             print(f"❌ Failed {url} ({response.status_code})")
 
-    except Exception as e:
+    except (requests.RequestException, OSError) as e:
         print(f"⚠️ Error downloading {url}: {e}")
 
 
