@@ -13,35 +13,66 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  python-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.13', '3.14', '3.15']
     steps:
-      - uses: Kesin11/actions-timeline@v1
+      - uses: actions/checkout@v7
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@v10
         with:
-         github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/checkout@v2
-      - name: Set up JDK 21
-        uses: actions/setup-java@v3
+          version: 'latest'
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: 'pyproject.toml'
+      - name: Install Python dependencies
+        run: uv sync --no-dev
+      - name: Create test temporary directory
+        run: mkdir -p .scratch/tmp
+      - name: Run Python regression tests
+        env:
+          TMPDIR: ${{ github.workspace }}/.scratch/tmp
+          TMP: ${{ github.workspace }}/.scratch/tmp
+          TEMP: ${{ github.workspace }}/.scratch/tmp
+        run: uv run --no-sync python -m unittest discover -v
+  build:
+    needs: python-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: Kesin11/actions-timeline@v3
         with:
-          java-version: '21'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v7
+      - name: Set up JDK 25
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
           distribution: 'temurin'
-      - name: Build with Maven
-        run: mvn -B package --file pom.xml
+          check-latest: true
+          cache: 'maven'
+      - name: Build and test with Maven
+        run: mvn -B verify --file pom.xml
       - name: Run Java Application
         run: java -jar target/bing-wallpaper-jar-with-dependencies.jar
-      - name: Commit files
+      - name: Commit and push changes
+        if: github.event_name != 'pull_request'
         run: |
           git config --local user.email "AgentPhoenix7@users.noreply.github.com"
-          git config --local user.name "github-actions"
-          git add README.md
-          git add bing-wallpaper.md
+          git config --local user.name "github-actions[bot]"
+          git add README.md bing-wallpaper.md
           if ! git diff --cached --quiet; then
             git commit -m "Update README.md & bing-wallpaper.md"
+            git push
           else
             echo "No changes to commit."
           fi
-      - name: Push changes
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}

@@ -1,27 +1,33 @@
 package net.ameizi.wallpaper;
 
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.http.HttpUtil;
-import cn.hutool.json.JSONObject;
-import cn.hutool.json.JSONUtil;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
-import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 public class Wallpaper {
 
-    private static final Path readmePath = Paths.get("README.md");
-    private static final Path wallpaperListPath = Paths.get("bing-wallpaper.md");
+    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(20))
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
+    private static final Path readmePath = Path.of("README.md");
+    private static final Path wallpaperListPath = Path.of("bing-wallpaper.md");
+    private static final Pattern WALLPAPER_PATTERN = Pattern.compile("^(.*?)\\s*\\|.*?\\[(.*?)\\]\\((.*?)\\)");
 
     // 请求API地址
     private static final String BING_API = "https://bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&nc=1618537156988&pid=hp&uhd=1&uhdwidth=3840&uhdheight=2160";
@@ -35,7 +41,7 @@ public class Wallpaper {
         List<Image> imageList = readWallPaperList();
         // imageList = last7Days(imageList);
         // 请求网络图片
-        String resp = HttpUtil.get(BING_API);
+        String resp = fetch(BING_API);
         // 解析成 Image对象
         Image image = parse(resp);
         // 在imageList下标为0的位置插入image
@@ -52,12 +58,25 @@ public class Wallpaper {
      * @param imageList
      * @return
      */
-    private static List<Image> last7Days(List<Image> imageList) {
+    private static List<Image> last7Days(List<Image> imageList) throws IOException, InterruptedException {
         for (int i = 0; i < 8; i++) {
-            String resp = HttpUtil.get(String.format(BING_7DAYS_API, i));
+            String resp = fetch(String.format(BING_7DAYS_API, i));
             imageList.add(parse(resp));
         }
         return imageList;
+    }
+
+    private static String fetch(String url) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofSeconds(30))
+                .GET()
+                .build();
+        HttpResponse<String> response = HTTP_CLIENT.send(request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (response.statusCode() != 200) {
+            throw new IOException("Bing request failed with HTTP " + response.statusCode());
+        }
+        return response.body();
     }
 
     /**
@@ -67,13 +86,16 @@ public class Wallpaper {
      * @return
      */
     private static Image parse(String resp) {
-        JSONObject jsonObject = JSONUtil.parseObj(resp);
-        JSONObject images = jsonObject.getJSONArray("images").get(0, JSONObject.class);
+        JsonObject images = JsonParser.parseString(resp).getAsJsonObject()
+                .getAsJsonArray("images").get(0).getAsJsonObject();
 
-        String url = String.format(BING_URL, images.getStr("url"));
-        url = url.substring(0, url.indexOf("&"));
-        String desc = images.getStr("copyright");
-        String enddate = images.getStr("enddate");
+        String url = String.format(BING_URL, images.get("url").getAsString());
+        int extraParameters = url.indexOf('&');
+        if (extraParameters >= 0) {
+            url = url.substring(0, extraParameters);
+        }
+        String desc = images.get("copyright").getAsString();
+        String enddate = images.get("enddate").getAsString();
 
         LocalDate localDate = LocalDate.parse(enddate, DateTimeFormatter.BASIC_ISO_DATE);
         enddate = localDate.format(DateTimeFormatter.ISO_LOCAL_DATE);
@@ -88,15 +110,17 @@ public class Wallpaper {
      * @throws Exception
      */
     public static List<Image> readWallPaperList() throws Exception {
+        if (!Files.exists(wallpaperListPath)) {
+            return new ArrayList<>();
+        }
         List<Image> imageList = new ArrayList<>();
-        Files.readAllLines(wallpaperListPath, StandardCharsets.UTF_8).forEach(line -> {
-            Pattern pattern = Pattern.compile("(.*)\\s\\|.*\\[(.*)\\]\\((.*)\\)");
-            Matcher matcher = pattern.matcher(line);
+        for (String line : Files.readAllLines(wallpaperListPath, StandardCharsets.UTF_8)) {
+            Matcher matcher = WALLPAPER_PATTERN.matcher(line);
             if (matcher.find()) {
                 Image image = new Image(matcher.group(1), matcher.group(2), matcher.group(3));
                 imageList.add(image);
             }
-        });
+        }
         return imageList;
     }
 
@@ -107,15 +131,11 @@ public class Wallpaper {
      * @throws Exception
      */
     public static void writeToWallPaperList(List<Image> imageList) throws Exception {
-        File wallpaper = wallpaperListPath.toFile();
-        if (!wallpaper.exists()) {
-            wallpaper.createNewFile();
-        }
-        FileUtil.writeUtf8String("## Bing Wallpaper", wallpaper);
-        FileUtil.appendUtf8String(System.lineSeparator() + System.lineSeparator(), wallpaper);
-        imageList.stream().distinct().collect(Collectors.toList()).forEach(item -> {
-            FileUtil.appendUtf8String(item.markdown(), wallpaper);
-        });
+        StringBuilder sb = new StringBuilder("## Bing Wallpaper")
+                .append(System.lineSeparator())
+                .append(System.lineSeparator());
+        imageList.stream().distinct().forEach(item -> sb.append(item.markdown()));
+        Files.writeString(wallpaperListPath, sb.toString(), StandardCharsets.UTF_8);
     }
 
     /**
@@ -125,37 +145,30 @@ public class Wallpaper {
      * @throws Exception
      */
     public static void writeToReadme(List<Image> imageList) throws Exception {
-        File readme = readmePath.toFile();
-        if (!readme.exists()) {
-            readme.createNewFile();
-        }
-        FileUtil.writeUtf8String("## Bing Wallpaper", readme);
-        FileUtil.appendUtf8String(System.lineSeparator() + System.lineSeparator(), readme);
-        // 取出第一个元素设为首图
         Image image = imageList.get(0);
-        String top = String.format("![%s](%s)", image.getDesc(), image.largeUrl()) + System.lineSeparator();
-        FileUtil.appendUtf8String(top, readme);
-        // 设置描述内容
-        String today = String.format("Today: [%s](%s)", image.getDesc(), image.getUrl()) + System.lineSeparator();
-        FileUtil.appendUtf8String(today, readme);
-        // 拼markdown表头
-        FileUtil.appendUtf8String("|      |      |      |" + System.lineSeparator(), readme);
-        FileUtil.appendUtf8String("| :--: | :--: | :--: |" + System.lineSeparator(), readme);
-        List<Image> images = imageList.stream().distinct().collect(Collectors.toList());
+        StringBuilder sb = new StringBuilder("## Bing Wallpaper")
+                .append(System.lineSeparator())
+                .append(System.lineSeparator())
+                .append(String.format("![%s](%s)", image.desc(), image.largeUrl()))
+                .append(System.lineSeparator())
+                .append(String.format("Today: [%s](%s)", image.desc(), image.url()))
+                .append(System.lineSeparator())
+                .append("|      |      |      |").append(System.lineSeparator())
+                .append("| :--: | :--: | :--: |").append(System.lineSeparator());
+
+        List<Image> images = imageList.stream().distinct().toList();
         int i = 1;
         for (Image item : images) {
-            // 写入markdown格式字符串
-            FileUtil.appendUtf8String("|" + item.toString(), readme);
-            // 每行三列，若刚整除，补每行末尾最后一个"|"
+            sb.append("|").append(item);
             if (i % 3 == 0) {
-                FileUtil.appendUtf8String("|" + System.lineSeparator(), readme);
+                sb.append("|").append(System.lineSeparator());
             }
-            // 行数加1
             i++;
         }
         if (i % 3 != 1) {
-            FileUtil.appendUtf8String("|" + System.lineSeparator(), readme);
+            sb.append("|").append(System.lineSeparator());
         }
+        Files.writeString(readmePath, sb.toString(), StandardCharsets.UTF_8);
     }
 
 }
